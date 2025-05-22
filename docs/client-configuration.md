@@ -9,6 +9,7 @@
 | socket.family                | `0`                                      | IP Stack version (one of `4 \| 6 \| 0`)                                                                                                                                                                                                             |
 | socket.path                  |                                          | Path to the UNIX Socket                                                                                                                                                                                                                             |
 | socket.connectTimeout        | `5000`                                   | Connection timeout (in milliseconds)                                                                                                                                                                                                                |
+| socket.socketTimeout           |                                          | The maximum duration (in milliseconds) that the socket can remain idle (i.e., with no data sent or received) before being automatically closed |
 | socket.noDelay               | `true`                                   | Toggle [`Nagle's algorithm`](https://nodejs.org/api/net.html#net_socket_setnodelay_nodelay)                                                                                                                                                         |
 | socket.keepAlive             | `true`                                   | Toggle [`keep-alive`](https://nodejs.org/api/net.html#socketsetkeepaliveenable-initialdelay) functionality                                                                                                                                          |
 | socket.keepAliveInitialDelay | `5000`                                   | If set to a positive number, it sets the initial delay before the first keepalive probe is sent on an idle socket                                                                                                                                   |
@@ -27,6 +28,7 @@
 | legacyMode                   | `false`                                  | Maintain some backwards compatibility (see the [Migration Guide](./v3-to-v4.md))                                                                                                                                                                    |
 | isolationPoolOptions         |                                          | An object that configures a pool of isolated connections, If you frequently need isolated connections, consider using [createClientPool](https://github.com/redis/node-redis/blob/master/docs/pool.md#creating-a-pool) instead                                                                                                     |
 | pingInterval                 |                                          | Send `PING` command at interval (in ms). Useful with ["Azure Cache for Redis"](https://learn.microsoft.com/en-us/azure/azure-cache-for-redis/cache-best-practices-connection#idle-timeout)                                                          |
+| disableClientInfo            | `false`                                  | Disables `CLIENT SETINFO LIB-NAME node-redis` and `CLIENT SETINFO LIB-VER X.X.X` commands                                                                                                                                                           | 
 
 ## Reconnect Strategy
 
@@ -40,7 +42,12 @@ By default the strategy uses exponential backoff, but it can be overwritten like
 ```javascript
 createClient({
   socket: {
-    reconnectStrategy: retries => {
+    reconnectStrategy: (retries, cause) => {
+        // By default, do not reconnect on socket timeout.
+        if (cause instanceof SocketTimeoutError) {
+          return false;
+        }
+
         // Generate a random jitter between 0 – 200 ms:
         const jitter = Math.floor(Math.random() * 200);
         // Delay is an exponential back off, (times^2) * 50 ms, with a maximum value of 2000 ms:
